@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import struct
+from dataclasses import dataclass
 
 # ---------------------------------------------------------
 # eBPF decoding utilities
@@ -23,3 +23,8 @@ class Insn:
         off = struct.unpack_from("<h", b, 2)[0]   # int16
         imm = struct.unpack_from("<i", b, 4)[0]   # int32
         return cls(opcode, dst, src, off, imm)
+
+    def to_str(self) -> str:
+        from disasm import EBPFDisassembler  # local import to avoid circular ref
+        dis = EBPFDisassembler()
+        return dis.disasm(self)
