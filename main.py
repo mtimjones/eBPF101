@@ -1,10 +1,15 @@
-import curses
 import time
-from typing import Optional
+import sys
+import curses
+import argparse
+from bpfelf import BpfELF
+from ebpf import EBPFVM
+from typing import Optional, List
 
 MAX_W = 90
 MAX_H = 30
 
+# Horribly inefficient, but works for now...
 def draw(stdscr):
     # Ensure the window is large enough to support the application.
     maxh, maxw = stdscr.getmaxyx()
@@ -56,11 +61,15 @@ def draw(stdscr):
     helpwin = mainwin.derwin(14, 26, 1, 63)
     helpwin.box()
     helpwin.addstr(0, 2, " Help ")
+    helpwin.addstr(1, 2, "r - Reset VM")
+    helpwin.addstr(2, 2, "n - Next Instruction")
+    helpwin.addstr(3, 2, "q - Quit Debugger")
 
     inswin = mainwin.derwin(14, 88, 15, 1)
     inswin.box()
     inswin.addstr(0, 2, " Disassembly ")
     inswin.addstr(1, 2, "PC    Bytes                    Instruction")
+
     inswin.addstr(2, 2, "0x00  b4 01 00 00 05 00 00 00  w1 = 0x5")
     inswin.addstr(3, 2, "0x01  63 1a fc ff 00 00 00 00  *(u32 *)(r10 - 0x4) = w1")
 
@@ -74,7 +83,7 @@ def draw(stdscr):
 
     stdscr.refresh()
 
-def main(stdscr):
+def UI(stdscr):
     stdscr.clear()
     curses.curs_set(0)
     curses.noecho()
@@ -88,5 +97,21 @@ def main(stdscr):
         if ch in (ord('q'), 27):
             break
 
+def main(argv: List[str]) -> None:
+    p = argparse.ArgumentParser(description="Minimal eBPF VM for BPF ELF64 objects")
+    p.add_argument("elf", help="Path to eBPF ELF object file")
+    args = p.parse_args(argv)
+
+    elf = BpfELF.from_file(args.elf)
+    code = elf.find_exec_section()
+
+    curses.wrapper(UI)
+
+    vm = EBPFVM(code)
+    ret = vm.run(10000)
+    vm.reset()
+    ret = vm.run(2)
+
+
 if __name__ == "__main__":
-    curses.wrapper(main)
+    raise SystemExit(main(sys.argv[1:]))
