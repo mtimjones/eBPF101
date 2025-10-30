@@ -10,7 +10,10 @@ MAX_W = 90
 MAX_H = 30
 
 # Horribly inefficient, but works for now...
-def draw(stdscr):
+def draw(stdscr, vm):
+
+    vm = vm['name']
+
     # Ensure the window is large enough to support the application.
     maxh, maxw = stdscr.getmaxyx()
     if maxh < MAX_H or maxw < MAX_W:
@@ -64,6 +67,7 @@ def draw(stdscr):
     helpwin.addstr(1, 2, "r - Reset VM")
     helpwin.addstr(2, 2, "n - Next Instruction")
     helpwin.addstr(3, 2, "q - Quit Debugger")
+    helpwin.addstr(8, 2, f"State: {vm.get_vm_state()}")
 
     inswin = mainwin.derwin(14, 88, 15, 1)
     inswin.box()
@@ -83,7 +87,7 @@ def draw(stdscr):
 
     stdscr.refresh()
 
-def UI(stdscr):
+def UI(stdscr, vm):
     stdscr.clear()
     curses.curs_set(0)
     curses.noecho()
@@ -92,7 +96,7 @@ def UI(stdscr):
     stdscr.keypad(True)
 
     while True:
-        draw(stdscr)
+        draw(stdscr, vm)
         ch = stdscr.getch()
         if ch in (ord('q'), 27):
             break
@@ -105,12 +109,15 @@ def main(argv: List[str]) -> None:
     elf = BpfELF.from_file(args.elf)
     code = elf.find_exec_section()
 
-    curses.wrapper(UI)
+    vm = EBPFVM(code)
+    my_vm = {"name": vm}
+
+    curses.wrapper(UI,my_vm)
 
     vm = EBPFVM(code)
-    ret = vm.run(10000)
+    ret = vm.run()
     vm.reset()
-    ret = vm.run(2)
+    ret = vm.run()
 
 
 if __name__ == "__main__":

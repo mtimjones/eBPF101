@@ -5,22 +5,17 @@ import os
 import sys
 import struct
 import bpf
+import globals
 from insn import Insn
 from enum import IntEnum
 from dataclasses import dataclass
 from typing import List, Optional
 
-class VMStateClass(IntEnum):
-    IDLE = 0x00
-    RUNNING = 0x01
-    SINGLE_STEP = 0x02
-    EXITED = 0x03
-
 class EBPFVM:
     STACK_SIZE = 96
 
     def __init__(self, code: bytes):
-        self.vm_state = 0
+        self.vm_state = globals.VMStateClass.IDLE
         self.code = code
         self._insn = self._decode_all(code)
         self.reset()
@@ -52,6 +47,9 @@ class EBPFVM:
     def _s64(x: int) -> int:
         x &= 0xFFFFFFFFFFFFFFFF
         return x if x < 0x8000000000000000 else x - 0x10000000000000000
+
+    def get_vm_state(self) -> globals.VMStateClass:
+        return self.vm_state 
 
     def _read_stack(self, addr: int, size: int) -> int:
         if not (0 <= addr and addr + size <= len(self.stack)):
@@ -92,15 +90,12 @@ class EBPFVM:
         self.reg[10] = len(self.stack)  # R10 (frame pointer) points to top of stack
         self.pc = 0
 
-    def run(self, max_steps: int) -> None:
-        self.max_steps = max_steps
-        while self.pc < len(self._insn) and self.vm_state != VMStateClass.EXITED:
+    def run(self) -> None:
+        while self.pc < len(self._insn) and self.vm_state != globals.VMStateClass.EXITED:
             self.step()
 
     def step(self) -> None:
         self.steps += 1
-        if self.steps > self.max_steps:
-            raise RuntimeError("Instruction step limit exceeded")
 
         ins = self._insn[self.pc]
         cls = ins.opcode & bpf.BPF_CLASS_MASK
@@ -127,7 +122,7 @@ class EBPFVM:
         if cls in (bpf.BPF_JMP, bpf.BPF_JMP32):
             taken = self._exec_jump(ins, is32 = (cls == bpf.BPF_JMP32))
             if taken is None:
-                self.vm_state = VMStateClass.EXITED
+                self.vm_state = globals.VMStateClass.EXITED
                 # EXIT
                 return
             if taken:
