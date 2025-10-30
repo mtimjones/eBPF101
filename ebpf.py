@@ -90,6 +90,24 @@ class EBPFVM:
         self.reg[10] = len(self.stack)  # R10 (frame pointer) points to top of stack
         self.pc = 0
 
+    def get_reg_value(self, register) -> str:
+        val = self.reg[register]
+        s = f"{val:016X}"
+        s = f"{s[0:4]}_{s[4:8]}_{s[8:12]}_{s[12:16]}"
+        return s;
+
+    def get_pc(self) -> str:
+        val = self.pc
+        s = f"{val:03X}"
+        return s;
+
+    def get_stack(self, offset) -> str:
+        ret = ""
+        for i in range(8):
+            val = self.stack[offset+i]
+            ret += f"{val:02X} "
+        return ret
+
     def run(self) -> None:
         while self.pc < len(self._insn) and self.vm_state != globals.VMStateClass.EXITED:
             self.step()

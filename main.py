@@ -12,7 +12,8 @@ MAX_H = 30
 # Horribly inefficient, but works for now...
 def draw(stdscr, vm):
 
-    vm = vm['name']
+    VM = vm['name']
+    object = vm['object']
 
     # Ensure the window is large enough to support the application.
     maxh, maxw = stdscr.getmaxyx()
@@ -27,47 +28,49 @@ def draw(stdscr, vm):
 
     mainwin = curses.newwin(MAX_H, MAX_W, start_h, start_w)
     mainwin.box()
-    mainwin.addstr(0, 2, " eBPF Debugger ")
+    mainwin.addstr(0, 2, f" eBPF Debugger [{object}] ")
 
     regwin = mainwin.derwin(14, 28, 1, 1)
     regwin.box()
     regwin.addstr(0, 2, " Registers ")
-    regwin.addstr(1, 2,  "R0 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(2, 2,  "R1 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(3, 2,  "R2 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(4, 2,  "R3 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(5, 2,  "R4 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(6, 2,  "R5 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(7, 2,  "R6 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(8, 2,  "R7 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(9, 2,  "R8 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(10, 2, "R9 : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(11, 2, "FP : XXXX_XXXX_XXXX_XXXX")
-    regwin.addstr(12, 2, "PC : XXX")
+    regwin.addstr(1, 2,  f"R0 : {VM.get_reg_value(0)}")
+    regwin.addstr(2, 2,  f"R1 : {VM.get_reg_value(1)}")
+    regwin.addstr(3, 2,  f"R2 : {VM.get_reg_value(2)}")
+    regwin.addstr(4, 2,  f"R3 : {VM.get_reg_value(3)}")
+    regwin.addstr(5, 2,  f"R4 : {VM.get_reg_value(4)}")
+    regwin.addstr(6, 2,  f"R5 : {VM.get_reg_value(5)}")
+    regwin.addstr(7, 2,  f"R6 : {VM.get_reg_value(6)}")
+    regwin.addstr(8, 2,  f"R7 : {VM.get_reg_value(7)}")
+    regwin.addstr(9, 2,  f"R8 : {VM.get_reg_value(8)}")
+    regwin.addstr(10, 2, f"R9 : {VM.get_reg_value(9)}")
+    regwin.addstr(11, 2, f"FP : {VM.get_reg_value(10)}")
+    regwin.addstr(12, 2, f"PC : {VM.get_pc()}")
 
     stackwin = mainwin.derwin(14, 34, 1, 29)
     stackwin.box()
     stackwin.addstr(0, 2, " Stack ")
-    stackwin.addstr(1, 2, "fp-00: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(2, 2, "fp-08: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(3, 2, "fp-10: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(4, 2, "fp-18: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(5, 2, "fp-20: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(6, 2, "fp-28: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(7, 2, "fp-30: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(8, 2, "fp-38: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(9, 2, "fp-40: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(10, 2, "fp-48: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(11, 2, "fp-50: xx xx xx xx xx xx xx xx")
-    stackwin.addstr(12, 2, "fp-58: xx xx xx xx xx xx xx xx")
+    stackwin.addstr(1, 2, f"fp-00: {VM.get_stack(0)}")
+    stackwin.addstr(2, 2, f"fp-08: {VM.get_stack(8)}")
+    stackwin.addstr(3, 2, f"fp-10: {VM.get_stack(16)}")
+    stackwin.addstr(4, 2, f"fp-18: {VM.get_stack(24)}")
+    stackwin.addstr(5, 2, f"fp-20: {VM.get_stack(32)}")
+    stackwin.addstr(6, 2, f"fp-28: {VM.get_stack(40)}")
+    stackwin.addstr(7, 2, f"fp-30: {VM.get_stack(48)}")
+    stackwin.addstr(8, 2, f"fp-38: {VM.get_stack(56)}")
+    stackwin.addstr(9, 2, f"fp-40: {VM.get_stack(64)}")
+    stackwin.addstr(10, 2, f"fp-48: {VM.get_stack(72)}")
+    stackwin.addstr(11, 2, f"fp-50: {VM.get_stack(80)}")
+    stackwin.addstr(12, 2, f"fp-58: {VM.get_stack(88)}")
 
     helpwin = mainwin.derwin(14, 26, 1, 63)
     helpwin.box()
     helpwin.addstr(0, 2, " Help ")
     helpwin.addstr(1, 2, "r - Reset VM")
     helpwin.addstr(2, 2, "n - Next Instruction")
-    helpwin.addstr(3, 2, "q - Quit Debugger")
-    helpwin.addstr(8, 2, f"State: {vm.get_vm_state()}")
+    helpwin.addstr(3, 2, "g - Go (run)")
+    helpwin.addstr(4, 2, "b - Interrupt VM")
+    helpwin.addstr(5, 2, "q - Quit Debugger")
+    helpwin.addstr(12, 2, f"VM State: {VM.get_vm_state().name}")
 
     inswin = mainwin.derwin(14, 88, 15, 1)
     inswin.box()
@@ -110,9 +113,9 @@ def main(argv: List[str]) -> None:
     code = elf.find_exec_section()
 
     vm = EBPFVM(code)
-    my_vm = {"name": vm}
+    my_vm = {"name": vm, "object": args.elf}
 
-    curses.wrapper(UI,my_vm)
+    curses.wrapper(UI, my_vm)
 
     vm = EBPFVM(code)
     ret = vm.run()
