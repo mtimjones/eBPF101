@@ -93,3 +93,4 @@ class EBPFDisassembler:
             return f".byte 0x{opcode:02x}  # unknown LD/ST form"
 
         return f".byte 0x{opcode:02x}  # unknown class"
+

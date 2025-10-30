@@ -108,6 +108,14 @@ class EBPFVM:
             ret += f"{val:02X} "
         return ret
 
+    def get_disasm(self, offset) -> str:
+        insn = self._insn[offset]
+        return insn.to_str()
+
+    def get_insn_hex(self, offset) -> str:
+        insn = self._insn[offset]
+        return insn.get_insn_hex()
+
     def run(self) -> None:
         while self.pc < len(self._insn) and self.vm_state != globals.VMStateClass.EXITED:
             self.step()

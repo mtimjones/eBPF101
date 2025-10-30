@@ -75,11 +75,19 @@ def draw(stdscr, vm):
     inswin = mainwin.derwin(14, 88, 15, 1)
     inswin.box()
     inswin.addstr(0, 2, " Disassembly ")
-    inswin.addstr(1, 2, "PC    Bytes                    Instruction")
+    inswin.addstr(1, 2, "PC   Bytes                    Instruction")
 
-    inswin.addstr(2, 2, "0x00  b4 01 00 00 05 00 00 00  w1 = 0x5")
-    inswin.addstr(3, 2, "0x01  63 1a fc ff 00 00 00 00  *(u32 *)(r10 - 0x4) = w1")
+    curses.init_pair(1, curses.COLOR_YELLOW, -1)  # pair 1 = yellow
 
+    pc = VM.pc
+    for i in range(11):
+        if i == pc:
+            inswin.addstr(2+i, 2, f"{i:2}:  {VM.get_insn_hex(i)}  ")
+            inswin.addstr(VM.get_disasm(i), curses.color_pair(1) | curses.A_BOLD)
+        else:
+            inswin.addstr(2+i, 2, f"{i:2}:  {VM.get_insn_hex(i)}  {VM.get_disasm(i)}")
+
+    # Refresh all windows at the same time.
     mainwin.noutrefresh()
     regwin.noutrefresh()
     stackwin.noutrefresh()
@@ -97,12 +105,19 @@ def UI(stdscr, vm):
     curses.cbreak()
     stdscr.nodelay(True)
     stdscr.keypad(True)
+    curses.start_color()
+    curses.use_default_colors()
 
     while True:
         draw(stdscr, vm)
+        VM = vm['name']
         ch = stdscr.getch()
         if ch in (ord('q'), 27):
             break
+        if ch in (ord('n'), 25):
+            VM.step()
+        if ch in (ord('r'), 30):
+            VM.reset()
 
 def main(argv: List[str]) -> None:
     p = argparse.ArgumentParser(description="Minimal eBPF VM for BPF ELF64 objects")
@@ -118,8 +133,6 @@ def main(argv: List[str]) -> None:
     curses.wrapper(UI, my_vm)
 
     vm = EBPFVM(code)
-    ret = vm.run()
-    vm.reset()
     ret = vm.run()
 
 

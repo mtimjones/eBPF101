@@ -28,3 +28,17 @@ class Insn:
         from disasm import EBPFDisassembler  # local import to avoid circular ref
         dis = EBPFDisassembler()
         return dis.disasm(self)
+
+    def to_bytes(self) -> bytes:
+        regs = (self.src << 4) | self.dst
+        return bytes([
+            self.opcode,
+            regs,
+            self.off & 0xFF,
+            (self.off >> 8) & 0xFF,
+        ]) + self.imm.to_bytes(4, "little", signed=True)
+
+    def get_insn_hex(self) -> str:
+        b = self.to_bytes()
+        return " ".join(f"{b:02X}" for b in self.to_bytes())
+
