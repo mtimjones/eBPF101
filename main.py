@@ -2,6 +2,7 @@ import time
 import sys
 import curses
 import argparse
+import globals
 from bpfelf import BpfELF
 from ebpf import EBPFVM
 from typing import Optional, List
@@ -108,16 +109,39 @@ def UI(stdscr, vm):
     curses.start_color()
     curses.use_default_colors()
 
+    # Debugger loop -- nodelay is set above, so getch does not block.
     while True:
         draw(stdscr, vm)
         VM = vm['name']
         ch = stdscr.getch()
+
         if ch in (ord('q'), 27):
             break
-        if ch in (ord('n'), 25):
-            VM.step()
-        if ch in (ord('r'), 30):
-            VM.reset()
+
+        if VM.get_vm_state() == globals.VMStateClass.IDLE:
+            if ch in (ord('n'), 25):
+                VM.step()
+            elif ch in (ord('r'), 30):
+                VM.reset()
+            elif ch in (ord('g'), 37):
+                VM.set_vm_state(globals.VMStateClass.RUNNING)
+
+        if VM.get_vm_state() == globals.VMStateClass.RUNNING:
+            if ch in (ord('b'), 98):
+                VM.set_vm_state(globals.VMStateClass.IDLE)
+            elif ch in (ord('r'), 30):
+                VM.reset()
+            else:
+                VM.step()
+
+        if VM.get_vm_state() == globals.VMStateClass.EXITED:
+            if ch in (ord('r'), 30):
+                VM.reset()
+                VM.set_vm_state(globals.VMStateClass.IDLE)
+
+        # Sleep for 50ms (allows user to watch the running program).
+        time.sleep(0.05)
+
 
 def main(argv: List[str]) -> None:
     p = argparse.ArgumentParser(description="Minimal eBPF VM for BPF ELF64 objects")
@@ -131,9 +155,6 @@ def main(argv: List[str]) -> None:
     my_vm = {"name": vm, "object": args.elf}
 
     curses.wrapper(UI, my_vm)
-
-    vm = EBPFVM(code)
-    ret = vm.run()
 
 
 if __name__ == "__main__":

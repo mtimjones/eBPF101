@@ -51,6 +51,9 @@ class EBPFVM:
     def get_vm_state(self) -> globals.VMStateClass:
         return self.vm_state 
 
+    def set_vm_state(self, state) -> None:
+        self.vm_state = state
+
     def _read_stack(self, addr: int, size: int) -> int:
         if not (0 <= addr and addr + size <= len(self.stack)):
             raise RuntimeError("Stack access out of bounds")
@@ -116,14 +119,13 @@ class EBPFVM:
         insn = self._insn[offset]
         return insn.get_insn_hex()
 
-    def run(self) -> None:
-        while self.pc < len(self._insn) and self.vm_state != globals.VMStateClass.EXITED:
-            self.step()
-
     def step(self) -> None:
-        self.steps += 1
+        if self.pc >= len(self._insn):
+            return
 
+        self.steps += 1
         ins = self._insn[self.pc]
+
         cls = ins.opcode & bpf.BPF_CLASS_MASK
 
         # 64-bit imm load: two slots (opcode 0x18 with BPF_LD|BPF_DW|BPF_IMM)
