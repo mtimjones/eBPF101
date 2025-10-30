@@ -48,6 +48,9 @@ class EBPFVM:
         x &= 0xFFFFFFFFFFFFFFFF
         return x if x < 0x8000000000000000 else x - 0x10000000000000000
 
+    def get_code_size(self) -> int:
+        return len(self._insn)
+
     def get_vm_state(self) -> globals.VMStateClass:
         return self.vm_state 
 

@@ -10,6 +10,32 @@ from typing import Optional, List
 MAX_W = 90
 MAX_H = 30
 
+def display_instructions(inswin, VM):
+
+    window_size = 11
+    n = VM.get_code_size()
+    pc = VM.pc
+    if n == 0:
+        return
+
+    # Clamp PC to valid range
+    pc = max(0, min(pc, n - 1))
+
+    # Compute window bounds
+    start = max(0, min(pc, n - window_size))
+    end = min(n, start + window_size)
+
+    # Render items; PC always visible
+    j = 0
+    for i in range(start, end):
+        if i == pc:
+            inswin.addstr(2+j, 2, f"{i:2}:  {VM.get_insn_hex(i)}  ")
+            inswin.addstr(VM.get_disasm(i), curses.color_pair(1) | curses.A_BOLD)
+        else:
+            inswin.addstr(2+j, 2, f"{i:2}:  {VM.get_insn_hex(i)}  {VM.get_disasm(i)}")
+        j=j+1
+
+
 # Horribly inefficient, but works for now...
 def draw(stdscr, vm):
 
@@ -80,13 +106,7 @@ def draw(stdscr, vm):
 
     curses.init_pair(1, curses.COLOR_YELLOW, -1)  # pair 1 = yellow
 
-    pc = VM.pc
-    for i in range(11):
-        if i == pc:
-            inswin.addstr(2+i, 2, f"{i:2}:  {VM.get_insn_hex(i)}  ")
-            inswin.addstr(VM.get_disasm(i), curses.color_pair(1) | curses.A_BOLD)
-        else:
-            inswin.addstr(2+i, 2, f"{i:2}:  {VM.get_insn_hex(i)}  {VM.get_disasm(i)}")
+    display_instructions(inswin, VM)
 
     # Refresh all windows at the same time.
     mainwin.noutrefresh()
@@ -144,6 +164,7 @@ def UI(stdscr, vm):
 
 
 def main(argv: List[str]) -> None:
+
     p = argparse.ArgumentParser(description="Minimal eBPF VM for BPF ELF64 objects")
     p.add_argument("elf", help="Path to eBPF ELF object file")
     args = p.parse_args(argv)
