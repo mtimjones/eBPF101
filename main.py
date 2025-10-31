@@ -10,7 +10,14 @@ from typing import Optional, List
 MAX_W = 90
 MAX_H = 30
 
-def display_instructions(inswin, VM):
+def display_instructions(mainwin, VM):
+
+    inswin = mainwin.derwin(14, 88, 15, 1)
+    inswin.box()
+    inswin.addstr(0, 2, " Disassembly ")
+    inswin.addstr(1, 2, "PC   Bytes                    Instruction")
+
+    curses.init_pair(1, curses.COLOR_YELLOW, -1)  # pair 1 = yellow
 
     window_size = 11
     n = VM.get_code_size()
@@ -29,11 +36,104 @@ def display_instructions(inswin, VM):
     j = 0
     for i in range(start, end):
         if i == pc:
-            inswin.addstr(2+j, 2, f"{i:2}:  {VM.get_insn_hex(i)}  ")
+            inswin.addstr(2+j, 2, f"{i:02X}:  {VM.get_insn_hex(i)}  ")
             inswin.addstr(VM.get_disasm(i), curses.color_pair(1) | curses.A_BOLD)
         else:
-            inswin.addstr(2+j, 2, f"{i:2}:  {VM.get_insn_hex(i)}  {VM.get_disasm(i)}")
+            inswin.addstr(2+j, 2, f"{i:02X}:  {VM.get_insn_hex(i)}  {VM.get_disasm(i)}")
         j=j+1
+
+    inswin.noutrefresh()
+
+
+def display_registers(mainwin, VM):
+
+    regwin = mainwin.derwin(14, 28, 1, 1)
+    regwin.box()
+    regwin.addstr(0, 2, " Registers ")
+
+    # One-time color/attr init (stored on the function as "static")
+    if not hasattr(display_registers, "_inited"):
+        display_registers._inited = True
+        display_registers._prev_regs = None  # will store [R0..R9, FP, PC]
+        curses.init_pair(1, curses.COLOR_YELLOW, -1)
+
+    # Read current values
+    cur = [0] * 12
+    cur[0]  = VM.get_reg_value(0)
+    cur[1]  = VM.get_reg_value(1)
+    cur[2]  = VM.get_reg_value(2)
+    cur[3]  = VM.get_reg_value(3)
+    cur[4]  = VM.get_reg_value(4)
+    cur[5]  = VM.get_reg_value(5)
+    cur[6]  = VM.get_reg_value(6)
+    cur[7]  = VM.get_reg_value(7)
+    cur[8]  = VM.get_reg_value(8)
+    cur[9]  = VM.get_reg_value(9)
+    cur[10] = VM.get_reg_value(10)  # FP
+    cur[11] = VM.get_pc()           # PC
+
+    prev = display_registers._prev_regs
+
+    # Helper to print a line, highlighted if changed
+    def put(y, x, text, changed):
+        if changed:
+            regwin.addstr(y, x, text, curses.color_pair(1) | curses.A_BOLD)
+        else:
+            regwin.addstr(y, x, text)
+
+    # Emit R0..R9
+    i = 0
+    while i < 10:
+        label = f"R{i} : {cur[i]}"
+        changed = (prev is None) or (cur[i] != prev[i])
+        put(i+1, 2, label.ljust(24), changed)
+        i += 1
+
+    # FP (R10)
+    label_fp = f"FP : {cur[10]}"
+    changed_fp = (prev is None) or (cur[10] != prev[10])
+    put(11, 2, label_fp.ljust(24), changed_fp)
+
+    # PC
+    label_pc = f"PC : {cur[11]}"
+    put(12, 2, label_pc.ljust(24), False)
+
+    # Persist snapshot for next call
+    display_registers._prev_regs = cur
+
+
+def display_stack(mainwin, VM):
+    stackwin = mainwin.derwin(14, 34, 1, 29)
+    stackwin.box()
+    stackwin.addstr(0, 2, " Stack ")
+    stackwin.addstr(1, 2, f"fp-00: {VM.get_stack(0)}")
+    stackwin.addstr(2, 2, f"fp-08: {VM.get_stack(8)}")
+    stackwin.addstr(3, 2, f"fp-10: {VM.get_stack(16)}")
+    stackwin.addstr(4, 2, f"fp-18: {VM.get_stack(24)}")
+    stackwin.addstr(5, 2, f"fp-20: {VM.get_stack(32)}")
+    stackwin.addstr(6, 2, f"fp-28: {VM.get_stack(40)}")
+    stackwin.addstr(7, 2, f"fp-30: {VM.get_stack(48)}")
+    stackwin.addstr(8, 2, f"fp-38: {VM.get_stack(56)}")
+    stackwin.addstr(9, 2, f"fp-40: {VM.get_stack(64)}")
+    stackwin.addstr(10, 2, f"fp-48: {VM.get_stack(72)}")
+    stackwin.addstr(11, 2, f"fp-50: {VM.get_stack(80)}")
+    stackwin.addstr(12, 2, f"fp-58: {VM.get_stack(88)}")
+
+    stackwin.noutrefresh()
+
+
+def display_help(mainwin, VM):
+    helpwin = mainwin.derwin(14, 26, 1, 63)
+    helpwin.box()
+    helpwin.addstr(0, 2, " Help ")
+    helpwin.addstr(1, 2, "r - Reset VM")
+    helpwin.addstr(2, 2, "n - Next Instruction")
+    helpwin.addstr(3, 2, "g - Go (run)")
+    helpwin.addstr(4, 2, "b - Interrupt VM")
+    helpwin.addstr(5, 2, "q - Quit Debugger")
+    helpwin.addstr(12, 2, f"VM State: {VM.get_vm_state().name}")
+
+    helpwin.noutrefresh()
 
 
 # Horribly inefficient, but works for now...
@@ -57,63 +157,14 @@ def draw(stdscr, vm):
     mainwin.box()
     mainwin.addstr(0, 2, f" eBPF Debugger [{object}] ")
 
-    regwin = mainwin.derwin(14, 28, 1, 1)
-    regwin.box()
-    regwin.addstr(0, 2, " Registers ")
-    regwin.addstr(1, 2,  f"R0 : {VM.get_reg_value(0)}")
-    regwin.addstr(2, 2,  f"R1 : {VM.get_reg_value(1)}")
-    regwin.addstr(3, 2,  f"R2 : {VM.get_reg_value(2)}")
-    regwin.addstr(4, 2,  f"R3 : {VM.get_reg_value(3)}")
-    regwin.addstr(5, 2,  f"R4 : {VM.get_reg_value(4)}")
-    regwin.addstr(6, 2,  f"R5 : {VM.get_reg_value(5)}")
-    regwin.addstr(7, 2,  f"R6 : {VM.get_reg_value(6)}")
-    regwin.addstr(8, 2,  f"R7 : {VM.get_reg_value(7)}")
-    regwin.addstr(9, 2,  f"R8 : {VM.get_reg_value(8)}")
-    regwin.addstr(10, 2, f"R9 : {VM.get_reg_value(9)}")
-    regwin.addstr(11, 2, f"FP : {VM.get_reg_value(10)}")
-    regwin.addstr(12, 2, f"PC : {VM.get_pc()}")
+    display_registers(mainwin, VM)
+    display_stack(mainwin, VM)
+    display_help(mainwin, VM)
 
-    stackwin = mainwin.derwin(14, 34, 1, 29)
-    stackwin.box()
-    stackwin.addstr(0, 2, " Stack ")
-    stackwin.addstr(1, 2, f"fp-00: {VM.get_stack(0)}")
-    stackwin.addstr(2, 2, f"fp-08: {VM.get_stack(8)}")
-    stackwin.addstr(3, 2, f"fp-10: {VM.get_stack(16)}")
-    stackwin.addstr(4, 2, f"fp-18: {VM.get_stack(24)}")
-    stackwin.addstr(5, 2, f"fp-20: {VM.get_stack(32)}")
-    stackwin.addstr(6, 2, f"fp-28: {VM.get_stack(40)}")
-    stackwin.addstr(7, 2, f"fp-30: {VM.get_stack(48)}")
-    stackwin.addstr(8, 2, f"fp-38: {VM.get_stack(56)}")
-    stackwin.addstr(9, 2, f"fp-40: {VM.get_stack(64)}")
-    stackwin.addstr(10, 2, f"fp-48: {VM.get_stack(72)}")
-    stackwin.addstr(11, 2, f"fp-50: {VM.get_stack(80)}")
-    stackwin.addstr(12, 2, f"fp-58: {VM.get_stack(88)}")
-
-    helpwin = mainwin.derwin(14, 26, 1, 63)
-    helpwin.box()
-    helpwin.addstr(0, 2, " Help ")
-    helpwin.addstr(1, 2, "r - Reset VM")
-    helpwin.addstr(2, 2, "n - Next Instruction")
-    helpwin.addstr(3, 2, "g - Go (run)")
-    helpwin.addstr(4, 2, "b - Interrupt VM")
-    helpwin.addstr(5, 2, "q - Quit Debugger")
-    helpwin.addstr(12, 2, f"VM State: {VM.get_vm_state().name}")
-
-    inswin = mainwin.derwin(14, 88, 15, 1)
-    inswin.box()
-    inswin.addstr(0, 2, " Disassembly ")
-    inswin.addstr(1, 2, "PC   Bytes                    Instruction")
-
-    curses.init_pair(1, curses.COLOR_YELLOW, -1)  # pair 1 = yellow
-
-    display_instructions(inswin, VM)
+    display_instructions(mainwin, VM)
 
     # Refresh all windows at the same time.
     mainwin.noutrefresh()
-    regwin.noutrefresh()
-    stackwin.noutrefresh()
-    helpwin.noutrefresh()
-    inswin.noutrefresh()
     stdscr.noutrefresh()
     curses.doupdate()
 
@@ -159,8 +210,8 @@ def UI(stdscr, vm):
                 VM.reset()
                 VM.set_vm_state(globals.VMStateClass.IDLE)
 
-        # Sleep for 50ms (allows user to watch the running program).
-        time.sleep(0.05)
+        # Sleep for 100ms (allows user to watch the running program).
+        time.sleep(0.1)
 
 
 def main(argv: List[str]) -> None:
