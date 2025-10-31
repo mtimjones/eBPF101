@@ -225,8 +225,8 @@ def UI(stdscr, vm):
                 VM.reset()
                 VM.set_vm_state(globals.VMStateClass.IDLE)
 
-        # Sleep for 100ms (allows user to watch the running program).
-        time.sleep(0.1)
+        # Sleep for 50ms (allows user to watch the running program).
+        time.sleep(0.05)
 
 
 def main(argv: List[str]) -> None:
@@ -239,15 +239,15 @@ def main(argv: List[str]) -> None:
     elf = BpfELF.from_file(args.elf)
     code = elf.find_exec_section()
 
-    vm = EBPFVM(code)
+    vm = EBPFVM(code, args.mem_hex)
     my_vm = {"name": vm, "object": args.elf}
 
-    if args.mem_hex:
-        try:
-            n = vm.load_mem_from_hexfile(args.mem_hex)
-        except Exception as e:
-            print(f"Error loading memory file: {e}", file=sys.stderr)
-            return -1
+    #if args.mem_hex:
+    #    try:
+    #        n = vm.load_mem_from_hexfile(args.mem_hex)
+    #    except Exception as e:
+    #        print(f"Error loading memory file: {e}", file=sys.stderr)
+    #        return -1
 
     curses.wrapper(UI, my_vm)
 

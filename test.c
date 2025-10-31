@@ -11,6 +11,8 @@ int test_prog(void)
         if (SHM_MEM_BASE[i] == 0xff) {
 	    SHM_MEM_BASE[i] = 0;
 	    count++;
+	} else {
+	    SHM_MEM_BASE[i]++;
 	}
     }
 

@@ -16,10 +16,11 @@ class EBPFVM:
     MEM_SIZE = 128
     MEM_BASE = 0x0000
 
-    def __init__(self, code: bytes):
+    def __init__(self, code: bytes, hex_file):
         self.vm_state = globals.VMStateClass.IDLE
         self.code = code
         self._insn = self._decode_all(code)
+        self.hex_mem = hex_file
         self.reset()
 
     # ------------------------ decoding ------------------------
@@ -31,7 +32,7 @@ class EBPFVM:
             ins.append(Insn.from_bytes(code[i:i+8]))
         return ins
 
-    def load_mem_from_hexfile(self, path: str) -> int:
+    def _load_mem_from_hexfile(self, path: str) -> int:
         data: bytearray = bytearray()
         with open(path, 'r', encoding='utf-8') as f:
             for lineno, line in enumerate(f, 1):
@@ -51,10 +52,8 @@ class EBPFVM:
                     data.append(b)
         if len(data) > self.MEM_SIZE:
             raise RuntimeError(f"Hex file too large: {len(data)} bytes (max {self.MEM_SIZE})")
-        # Zero memory then copy
-        for i in range(self.MEM_SIZE):
-            self.mem[i] = 0
-            self.mem[0:len(data)] = data
+
+        self.mem[0:len(data)] = data
         return len(data)
 
     # ------------------------ helpers -------------------------
@@ -154,6 +153,8 @@ class EBPFVM:
         self.stack = bytearray(self.STACK_SIZE)
         self.reg[10] = len(self.stack)  # R10 (frame pointer) points to top of stack
         self.pc = 0
+        if self.hex_mem:
+            self._load_mem_from_hexfile(self.hex_mem)
 
     def get_reg_value(self, register) -> str:
         val = self.reg[register]
