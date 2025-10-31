@@ -190,23 +190,23 @@ def UI(stdscr, vm):
             break
 
         if VM.get_vm_state() == globals.VMStateClass.IDLE:
-            if ch in (ord('n'), 25):
+            if ch == ord('n'):
                 VM.step()
-            elif ch in (ord('r'), 30):
+            elif ch == ord('r'):
                 VM.reset()
-            elif ch in (ord('g'), 37):
+            elif ch == ord('g'):
                 VM.set_vm_state(globals.VMStateClass.RUNNING)
 
         if VM.get_vm_state() == globals.VMStateClass.RUNNING:
-            if ch in (ord('b'), 98):
+            if ch == ord('b'):
                 VM.set_vm_state(globals.VMStateClass.IDLE)
-            elif ch in (ord('r'), 30):
+            elif ch == ord('r'):
                 VM.reset()
             else:
                 VM.step()
 
         if VM.get_vm_state() == globals.VMStateClass.EXITED:
-            if ch in (ord('r'), 30):
+            if ch == ord('r'):
                 VM.reset()
                 VM.set_vm_state(globals.VMStateClass.IDLE)
 
