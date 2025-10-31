@@ -1,16 +1,17 @@
 
-#define SHM_MEM_BASE ((volatile unsigned char *)0x1000)
+#define SHM_MEM_BASE ((volatile unsigned char *)0x0000)
 
-
+// Search for and count 0xff in the memory space.
 int test_prog(void)
 {
-    int limit = 16;
-    int sum = 0;
+    int limit = 64;
+    int count = 0;
 
-    for (int i = 0 ; i < limit ; i++)
-    {
-        sum += *SHM_MEM_BASE+i;
+    for (int i = 0 ; i < limit ; i++) {
+        if (SHM_MEM_BASE[i] == 0xff) {
+	    count++;
+	}
     }
 
-    return sum;
+    return count;
 }

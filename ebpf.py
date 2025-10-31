@@ -13,6 +13,8 @@ from typing import List, Optional
 
 class EBPFVM:
     STACK_SIZE = 96
+    MEM_SIZE = 128
+    MEM_BASE = 0x0000
 
     def __init__(self, code: bytes):
         self.vm_state = globals.VMStateClass.IDLE
@@ -28,6 +30,32 @@ class EBPFVM:
         for i in range(0, len(code), 8):
             ins.append(Insn.from_bytes(code[i:i+8]))
         return ins
+
+    def load_mem_from_hexfile(self, path: str) -> int:
+        data: bytearray = bytearray()
+        with open(path, 'r', encoding='utf-8') as f:
+            for lineno, line in enumerate(f, 1):
+                # Strip comments and whitespace
+                line = line.split('#', 1)[0].strip()
+                if not line:
+                    continue
+                for tok in line.split():
+                    if len(tok) != 2:
+                        raise ValueError(f"Invalid token length on line {lineno}: '{tok}' (want two hex chars)")
+                    try:
+                        b = int(tok, 16)
+                    except ValueError as e:
+                        raise ValueError(f"Invalid hex byte on line {lineno}: '{tok}'") from e
+                    if not (0 <= b <= 0xFF):
+                        raise ValueError(f"Byte out of range on line {lineno}: {b}")
+                    data.append(b)
+        if len(data) > self.MEM_SIZE:
+            raise RuntimeError(f"Hex file too large: {len(data)} bytes (max {self.MEM_SIZE})")
+        # Zero memory then copy
+        for i in range(self.MEM_SIZE):
+            self.mem[i] = 0
+            self.mem[0:len(data)] = data
+        return len(data)
 
     # ------------------------ helpers -------------------------
     @staticmethod
@@ -85,6 +113,36 @@ class EBPFVM:
         else:
             raise RuntimeError("Invalid size for stack write")
 
+    # simple global memory window 
+    def _read_mem(self, vaddr: int, size: int) -> int:
+        if not (self.MEM_BASE <= vaddr and vaddr + size <= self.MEM_BASE + self.MEM_SIZE):
+            raise RuntimeError(f"Global memory read OOB at {vaddr:#x}, size={size}")
+        off = vaddr - self.MEM_BASE
+        if size == 1:
+            return self.mem[off]
+        if size == 2:
+            return struct.unpack_from("<H", self.mem, off)[0]
+        if size == 4:
+            return struct.unpack_from("<I", self.mem, off)[0]
+        if size == 8:
+            return struct.unpack_from("<Q", self.mem, off)[0]
+        raise RuntimeError("Invalid size for mem read")
+
+    def _write_mem(self, vaddr: int, size: int, value: int) -> None:
+        if not (self.MEM_BASE <= vaddr and vaddr + size <= self.MEM_BASE + self.MEM_SIZE):
+            raise RuntimeError(f"Global memory write OOB at {vaddr:#x}, size={size}")
+        off = vaddr - self.MEM_BASE
+        if size == 1:
+            self.mem[off] = value & 0xFF
+        elif size == 2:
+            struct.pack_into("<H", self.mem, off, value & 0xFFFF)
+        elif size == 4:
+            struct.pack_into("<I", self.mem, off, value & 0xFFFFFFFF)
+        elif size == 8:
+            struct.pack_into("<Q", self.mem, off, value & 0xFFFFFFFFFFFFFFFF)
+        else:
+            raise RuntimeError("Invalid size for mem write")
+
     def _mem_size_from_opcode(self, opcode: int) -> int:
         sz = opcode & 0x18
         return {bpf.BPF_B:1, bpf.BPF_H:2, bpf.BPF_W:4, bpf.BPF_DW:8}[sz]
@@ -92,6 +150,7 @@ class EBPFVM:
     def reset(self) -> None:
         self.steps = 0
         self.reg = [0] * 11    # R0..R10
+        self.mem = bytearray(self.MEM_SIZE)
         self.stack = bytearray(self.STACK_SIZE)
         self.reg[10] = len(self.stack)  # R10 (frame pointer) points to top of stack
         self.pc = 0
@@ -255,14 +314,15 @@ class EBPFVM:
 
         a = self.reg[ins.dst]
         b = self.reg[ins.src] if src_is_reg else ins.imm
-        cond = self._cmp(op, a, b, is32=is32)
-        return cond
+        return self._cmp(op, a, b, is32=is32)
 
     def _addr_from_fp(self, base_reg: int, off: int) -> int:
-        if base_reg != 10:
+        if base_reg == 10:
             # For simplicity we only allow stack addressing via FP (R10)
-            raise RuntimeError("Only R10 (frame pointer) based memory is supported")
-        fp = self.reg[10]
+            #raise RuntimeError("Only R10 (frame pointer) based memory is supported")
+            fp = self.reg[10]
+        else:
+            fp = self.reg[base_reg]
         addr = fp + off
         return addr
 
@@ -271,22 +331,43 @@ class EBPFVM:
         cls = ins.opcode & bpf.BPF_CLASS_MASK
 
         if cls == bpf.BPF_LDX:
-            addr = self._addr_from_fp(ins.src, ins.off)
-            val = self._read_stack(addr, size)
-            if size != 8:
-                val = {1: val & 0xFF, 2: val & 0xFFFF, 4: val & 0xFFFFFFFF}[size]
+            # addr = base_reg + off; base R10 => stack, else global window
+            if ins.src == 10:
+                addr = self.reg[10] + ins.off
+                val = self._read_stack(addr, size)
+                where = f"[fp{ins.off:+d}]"
+            else:
+                vaddr = (self.reg[ins.src] + ins.off) & 0xFFFFFFFFFFFFFFFF
+                val = self._read_mem(vaddr, size)
+                where = f"[{vaddr:#x}]"
+            # zero-extend to 64
+            if size == 1: val &= 0xFF
+            elif size == 2: val &= 0xFFFF
+            elif size == 4: val &= 0xFFFFFFFF
             self.reg[ins.dst] = self._u64(val)
             return
 
         if cls == bpf.BPF_STX:
-            addr = self._addr_from_fp(ins.dst, ins.off)
-            val = self.reg[ins.src]
-            self._write_stack(addr, size, val)
-            return
+                if ins.dst == 10:
+                        addr = self.reg[10] + ins.off
+                        self._write_stack(addr, size, self.reg[ins.src])
+                        where = f"[fp{ins.off:+d}]"
+                else:
+                        vaddr = (self.reg[ins.dst] + ins.off) & 0xFFFFFFFFFFFFFFFF
+                        self._write_mem(vaddr, size, self.reg[ins.src])
+                        where = f"[{vaddr:#x}]"
+                return
 
         if cls == bpf.BPF_ST:
-            addr = self._addr_from_fp(ins.dst, ins.off)
-            self._write_stack(addr, size, ins.imm)
+            if ins.dst == 10:
+                addr = self.reg[10] + ins.off
+                self._write_stack(addr, size, ins.imm)
+                where = f"[fp{ins.off:+d}]"
+            else:
+                vaddr = (self.reg[ins.dst] + ins.off) & 0xFFFFFFFFFFFFFFFF
+                self._write_mem(vaddr, size, ins.imm)
+                where = f"[{vaddr:#x}]"
             return
 
         raise RuntimeError("Unsupported memory instruction")
+

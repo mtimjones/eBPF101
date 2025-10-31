@@ -219,6 +219,7 @@ def main(argv: List[str]) -> None:
 
     p = argparse.ArgumentParser(description="Minimal eBPF VM for BPF ELF64 objects")
     p.add_argument("elf", help="Path to eBPF ELF object file")
+    p.add_argument("--mem-hex", help="White-space hex bytes for memory.")
     args = p.parse_args(argv)
 
     elf = BpfELF.from_file(args.elf)
@@ -226,6 +227,13 @@ def main(argv: List[str]) -> None:
 
     vm = EBPFVM(code)
     my_vm = {"name": vm, "object": args.elf}
+
+    if args.mem_hex:
+        try:
+            n = vm.load_mem_from_hexfile(args.mem_hex)
+        except Exception as e:
+            print(f"Error loading memory file: {e}", file=sys.stderr)
+            return -1
 
     curses.wrapper(UI, my_vm)
 
