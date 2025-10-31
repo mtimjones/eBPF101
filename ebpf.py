@@ -173,6 +173,17 @@ class EBPFVM:
             ret += f"{val:02X} "
         return ret
 
+    def get_mem(self, offset) -> str:
+        ret = f"  {offset:02X}: "
+        for i in range(16):
+            val = self.mem[offset+i]
+            ret += f"{val:02X} "
+        ret += " "
+        for i in range(16):
+            ch = chr(self.mem[offset+i])
+            ret += f"{ch if ch.isprintable() else '.'}"
+        return ret
+
     def get_disasm(self, offset) -> str:
         insn = self._insn[offset]
         return insn.to_str()

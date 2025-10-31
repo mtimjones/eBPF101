@@ -8,14 +8,27 @@ from ebpf import EBPFVM
 from typing import Optional, List
 
 MAX_W = 90
-MAX_H = 30
+MAX_H = 37
+
+def display_memory(mainwin, VM):
+
+    memwin = mainwin.derwin(7, 88, 15, 1)
+    memwin.box()
+    memwin.addstr(0, 2, " Memory ")
+    memwin.addstr(1, 2, f"Addr  Bytes {' '*42} ASCII")
+    memwin.addstr(2, 2, VM.get_mem(0));
+    memwin.addstr(3, 2, VM.get_mem(16));
+    memwin.addstr(4, 2, VM.get_mem(32));
+    memwin.addstr(5, 2, VM.get_mem(48));
+
+    memwin.noutrefresh()
 
 def display_instructions(mainwin, VM):
 
-    inswin = mainwin.derwin(14, 88, 15, 1)
+    inswin = mainwin.derwin(14, 88, 22, 1)
     inswin.box()
     inswin.addstr(0, 2, " Disassembly ")
-    inswin.addstr(1, 2, "PC   Bytes                    Instruction")
+    inswin.addstr(1, 2, f"PC   Bytes {' '*18} Instruction")
 
     curses.init_pair(1, curses.COLOR_YELLOW, -1)  # pair 1 = yellow
 
@@ -161,6 +174,7 @@ def draw(stdscr, vm):
     display_registers(mainwin, VM)
     display_stack(mainwin, VM)
     display_help(mainwin, VM)
+    display_memory(mainwin, VM)
 
     display_instructions(mainwin, VM)
 
