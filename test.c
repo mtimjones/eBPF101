@@ -9,6 +9,7 @@ int test_prog(void)
 
     for (int i = 0 ; i < limit ; i++) {
         if (SHM_MEM_BASE[i] == 0xff) {
+	    SHM_MEM_BASE[i] = 0;
 	    count++;
 	}
     }
