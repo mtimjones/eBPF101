@@ -122,6 +122,9 @@ class EBPFVM:
         insn = self._insn[offset]
         return insn.get_insn_hex()
 
+    def get_steps(self) -> str:
+        return f"{self.steps:04d}"
+
     def step(self) -> None:
         if self.pc >= len(self._insn):
             return

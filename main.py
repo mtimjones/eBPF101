@@ -131,6 +131,7 @@ def display_help(mainwin, VM):
     helpwin.addstr(3, 2, "g - Go (run)")
     helpwin.addstr(4, 2, "b - Interrupt VM")
     helpwin.addstr(5, 2, "q - Quit Debugger")
+    helpwin.addstr(11, 2, f"VM Steps: {VM.get_steps()}")
     helpwin.addstr(12, 2, f"VM State: {VM.get_vm_state().name}")
 
     helpwin.noutrefresh()
