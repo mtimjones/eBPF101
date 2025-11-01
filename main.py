@@ -225,8 +225,8 @@ def UI(stdscr, vm):
                 VM.reset()
                 VM.set_vm_state(globals.VMStateClass.IDLE)
 
-        # Sleep for 50ms (allows user to watch the running program).
-        time.sleep(0.05)
+        # Sleep for 25ms (allows user to watch the running program).
+        time.sleep(0.025)
 
 
 def main(argv: List[str]) -> None:
