@@ -10,6 +10,27 @@ from typing import Optional, List
 MAX_W = 90
 MAX_H = 37
 
+rbuf_last_popped = 0
+
+def display_ringbuf(mainwin, VM):
+    global rbuf_last_popped
+
+    rbufwin = mainwin.derwin(14, 26, 1, 63)
+    rbufwin.box()
+    rbufwin.addstr(0, 2, " Ring Buffer ")
+    rbufwin.addstr(1, 2, f"head={VM.get_rb_head():02X}  tail={VM.get_rb_tail():02X}");
+    for i in range(8):
+        rbufwin.addstr(3+i, 2, VM.get_ringbuf(i*4))
+
+    # This is the user-space reader of the ring-buf...
+    valid, value = VM.get_ringbuf_element()
+    if valid:
+        rbuf_last_popped = value
+
+    rbufwin.addstr(12, 2, f" Last Popped: {rbuf_last_popped:02X}")
+
+    rbufwin.noutrefresh()
+
 def display_memory(mainwin, VM):
 
     memwin = mainwin.derwin(7, 88, 15, 1)
@@ -25,7 +46,7 @@ def display_memory(mainwin, VM):
 
 def display_instructions(mainwin, VM):
 
-    inswin = mainwin.derwin(14, 88, 22, 1)
+    inswin = mainwin.derwin(14, 61, 22, 1)
     inswin.box()
     inswin.addstr(0, 2, " Disassembly ")
     inswin.addstr(1, 2, f"PC   Bytes {' '*18} Instruction")
@@ -134,9 +155,8 @@ def display_stack(mainwin, VM):
 
     stackwin.noutrefresh()
 
-
 def display_help(mainwin, VM):
-    helpwin = mainwin.derwin(14, 26, 1, 63)
+    helpwin = mainwin.derwin(14, 26, 22, 63)
     helpwin.box()
     helpwin.addstr(0, 2, " Help ")
     helpwin.addstr(1, 2, "r - Reset VM")
@@ -175,6 +195,7 @@ def draw(stdscr, vm):
     display_stack(mainwin, VM)
     display_help(mainwin, VM)
     display_memory(mainwin, VM)
+    display_ringbuf(mainwin, VM)
 
     display_instructions(mainwin, VM)
 
@@ -225,8 +246,8 @@ def UI(stdscr, vm):
                 VM.reset()
                 VM.set_vm_state(globals.VMStateClass.IDLE)
 
-        # Sleep for 25ms (allows user to watch the running program).
-        time.sleep(0.025)
+        # Sleep for 50ms (allows user to watch the running program).
+        time.sleep(0.05)
 
 
 def main(argv: List[str]) -> None:
@@ -241,13 +262,6 @@ def main(argv: List[str]) -> None:
 
     vm = EBPFVM(code, args.mem_hex)
     my_vm = {"name": vm, "object": args.elf}
-
-    #if args.mem_hex:
-    #    try:
-    #        n = vm.load_mem_from_hexfile(args.mem_hex)
-    #    except Exception as e:
-    #        print(f"Error loading memory file: {e}", file=sys.stderr)
-    #        return -1
 
     curses.wrapper(UI, my_vm)
 

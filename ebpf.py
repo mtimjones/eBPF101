@@ -8,11 +8,14 @@ import bpf
 import globals
 from insn import Insn
 from enum import IntEnum
+from ringbuf import ByteRing
 from dataclasses import dataclass
 from typing import List, Optional
 
 class EBPFVM:
     STACK_SIZE = 96
+    RBUF_SIZE = 96
+    RBUF_BASE = 0x1000
     MEM_SIZE = 128
     MEM_BASE = 0x0000
 
@@ -21,6 +24,7 @@ class EBPFVM:
         self.code = code
         self._insn = self._decode_all(code)
         self.hex_mem = hex_file
+        self.ringbuf = ByteRing();
         self.reset()
 
     # ------------------------ decoding ------------------------
@@ -151,6 +155,7 @@ class EBPFVM:
         self.reg = [0] * 11    # R0..R10
         self.mem = bytearray(self.MEM_SIZE)
         self.stack = bytearray(self.STACK_SIZE)
+        self.ringbuf.reset()
         self.reg[10] = len(self.stack)  # R10 (frame pointer) points to top of stack
         self.pc = 0
         if self.hex_mem:
@@ -185,6 +190,17 @@ class EBPFVM:
             ret += f"{ch if ch.isprintable() else '.'}"
         return ret
 
+    def get_ringbuf(self, offset) -> str:
+        ret = f" {offset:02X}: "
+        for i in range(4):
+            val = self.ringbuf.get_byte(offset+i)
+            ret += f"{val:02X} "
+        ret += " "
+        for i in range(4):
+            ch = chr(self.ringbuf.get_byte(offset+i))
+            ret += f"{ch if ch.isprintable() else '.'}"
+        return ret
+
     def get_disasm(self, offset) -> str:
         insn = self._insn[offset]
         return insn.to_str()
@@ -195,6 +211,18 @@ class EBPFVM:
 
     def get_steps(self) -> str:
         return f"{self.steps:04d}"
+
+    def get_rb_head(self) -> int:
+        return self.ringbuf.get_head()
+
+    def get_rb_tail(self) -> int:
+        return self.ringbuf.get_tail()
+
+    def get_ringbuf_element(self) -> tuple[bool, int]:
+        if self.ringbuf.empty():
+            return False, 0
+        else:
+            return True, self.ringbuf.pop()
 
     def step(self) -> None:
         if self.pc >= len(self._insn):
@@ -320,9 +348,16 @@ class EBPFVM:
         if op == bpf.BPF_EXIT:
             return None
 
-        # CALL not yet supported in this VM
+        # CALL supported for ring-buffer only.
         if op == bpf.BPF_CALL:
-            raise RuntimeError("Helper calls are not yet supported in this VM")
+            hid = ins.imm
+            if hid == 1:
+                data = self.reg[2]
+                self.ringbuf.push(data)
+            else:
+                raise RuntimeError(f"Unsupported helper id {hid}")
+
+            return False
 
         a = self.reg[ins.dst]
         b = self.reg[ins.src] if src_is_reg else ins.imm
