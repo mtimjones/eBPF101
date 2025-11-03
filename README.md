@@ -17,7 +17,9 @@ This was written for the 2025 eBPF Summit: Hackathon Edition.
 ## Introduction
 My goal was to implement a simple lab for the visualization of eBPF programs.
 This will allow the user to compile a C program into eBPF instructions for 
-debugging using clang.
+debugging using clang.  The program can be run non-interactively, or in a
+single-step mode to permit monitoring of changes to stack, memory, registers,
+and ring-buffer.
 
 ## Debugger Display
 
@@ -29,6 +31,12 @@ debugging using clang.
 - Byte-based ring-buffer.
 - Real-time and Single-Step execution.
 - Visualization of instructions, memory, registers, stack, and ring-buffer.
+
+## Limitations
+
+- Implements a subset of the eBPF instruction set.
+- Does not implement Maps (Array or Hash).
+- The ring-buffer is a simplified version, but uses call with the hid==1.
 
 ## Architecture
 
