@@ -19,6 +19,10 @@ My goal was to implement a simple lab for the visualization of eBPF programs.
 This will allow the user to compile a C program into eBPF instructions for 
 debugging using clang.
 
+## Debugger Display
+
+![Screen Capture of the Debugger](./image.png)
+
 ## What's Implemented
 - Subset of the eBPF instruction set (but enough for most eBPF programs).
 - Small local memory.
